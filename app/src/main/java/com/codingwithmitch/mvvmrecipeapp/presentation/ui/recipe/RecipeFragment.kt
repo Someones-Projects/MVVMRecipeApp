@@ -1,12 +1,14 @@
 package com.codingwithmitch.mvvmrecipeapp.presentation.ui.recipe
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollableColumn
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -19,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageAsset
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.DensityAmbient
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -26,8 +29,10 @@ import androidx.navigation.findNavController
 import com.codingwithmitch.mvvmrecipeapp.R
 import com.codingwithmitch.mvvmrecipeapp.domain.model.Recipe
 import com.codingwithmitch.mvvmrecipeapp.presentation.BaseApplication
+import com.codingwithmitch.mvvmrecipeapp.presentation.components.CollapsingImageLayout
 import com.codingwithmitch.mvvmrecipeapp.presentation.components.LoadingRecipeShimmer
 import com.codingwithmitch.mvvmrecipeapp.util.DEFAULT_RECIPE_IMAGE
+import com.codingwithmitch.mvvmrecipeapp.util.TAG
 import com.codingwithmitch.mvvmrecipeapp.util.loadPicture
 import com.codingwithmitch.openchat.common.framework.presentation.theme.AppTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -74,18 +79,19 @@ class RecipeFragment: Fragment() {
 
                     Scaffold(
                             topBar = {
-                                TopAppBar(
-                                        elevation = 8.dp,
-                                        backgroundColor = MaterialTheme.colors.secondary
-                                ){
-                                    IconButton(
-                                            onClick = {
-                                                findNavController().popBackStack()
-                                            },
-                                            icon = {Icon(Icons.Default.ArrowBack)},
-                                            modifier = Modifier.align(Alignment.CenterVertically),
-                                    )
-                                }
+//                                TopAppBar(
+//                                        elevation = 8.dp,
+//                                        backgroundColor = MaterialTheme.colors.secondary
+//                                ){
+//                                    IconButton(
+//                                            onClick = {
+//                                                findNavController().popBackStack()
+//                                            },
+//                                            icon = {Icon(Icons.Default.ArrowBack)},
+//                                            modifier = Modifier.align(Alignment.CenterVertically),
+//                                    )
+//                                }
+
                             },
                             scaffoldState = scaffoldState,
                             snackbarHost = {
@@ -108,100 +114,120 @@ class RecipeFragment: Fragment() {
 
 @ExperimentalCoroutinesApi
 @Composable
+private fun CollapsingImage(
+        imageUrl: String,
+        scroll: Float
+) {
+    Log.d(TAG, "CollapsingImage: scroll: ${scroll}")
+    val image by loadPicture(url = imageUrl, defaultImage = DEFAULT_RECIPE_IMAGE).collectAsState()
+    image?.let { img ->
+        var height = IMAGE_HEIGHT
+        if(scroll > 0){
+            height = (IMAGE_HEIGHT - scroll).toInt()
+        }
+        Image(
+                asset = img.asImageAsset(),
+                modifier = Modifier
+                        .fillMaxWidth()
+                        .preferredHeight(height.dp)
+                ,
+                contentScale = ContentScale.Crop,
+        )
+    }
+}
+
+@ExperimentalCoroutinesApi
+@Composable
 fun RecipeView(
         recipe: Recipe,
 ){
+    val scroll = rememberScrollState(0f)
     ScrollableColumn(
+            scrollState = scroll,
             modifier = Modifier
                     .fillMaxWidth()
     ) {
         recipe.featuredImage?.let { url ->
-            val image by loadPicture(url = url, defaultImage = DEFAULT_RECIPE_IMAGE).collectAsState()
-            image?.let { img ->
-                Image(
-                        asset = img.asImageAsset(),
+            CollapsingImage(
+                    imageUrl = url,
+                    scroll = scroll.value
+            )
+        }
+//            val image by loadPicture(url = url, defaultImage = DEFAULT_RECIPE_IMAGE).collectAsState()
+//            image?.let { img ->
+//                Image(
+//                        asset = img.asImageAsset(),
+//                        modifier = Modifier
+//                                .fillMaxWidth()
+//                                .preferredHeight(IMAGE_HEIGHT.dp)
+//                        ,
+//                        contentScale = ContentScale.Crop,
+//                )
+//            }
+        Column(
+                modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp)
+        ) {
+            recipe.title?.let { title ->
+                Row(
                         modifier = Modifier
                                 .fillMaxWidth()
-                                .preferredHeight(IMAGE_HEIGHT.dp)
-                        ,
-                        contentScale = ContentScale.Crop,
-                )
-            }
-            Column(
-                    modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp)
-            ) {
-                recipe.title?.let { title ->
-                    Row(
+                                .padding(bottom = 4.dp)
+                ){
+                    Text(
+                            text = title,
+                            modifier = Modifier
+                                    .fillMaxWidth(0.85f)
+                                    .wrapContentWidth(Alignment.Start)
+                            ,
+                            style = MaterialTheme.typography.h3
+                    )
+                    val rank = recipe.rating.toString()
+                    Text(
+                            text = rank,
                             modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(bottom = 4.dp)
-                    ){
-                        Text(
-                                text = title,
-                                modifier = Modifier
-                                        .fillMaxWidth(0.85f)
-                                        .wrapContentWidth(Alignment.Start)
-                                ,
-                                style = MaterialTheme.typography.h3
-                        )
-                        val rank = recipe.rating.toString()
-                        Text(
-                                text = rank,
-                                modifier = Modifier
-                                        .fillMaxWidth()
-                                        .wrapContentWidth(Alignment.End)
-                                        .align(Alignment.CenterVertically)
-                                ,
-                                style = MaterialTheme.typography.h5
-                        )
-                    }
-                }
-                recipe.publisher?.let { publisher ->
-                    val updated = recipe.dateUpdated
-                    Text(
-                            text = if(updated != null) {
-                                "Updated ${updated} by ${publisher}"
-                            }
-                            else {
-                                "By ${publisher}"
-                            }
+                                    .wrapContentWidth(Alignment.End)
+                                    .align(Alignment.CenterVertically)
                             ,
+                            style = MaterialTheme.typography.h5
+                    )
+                }
+            }
+            recipe.publisher?.let { publisher ->
+                val updated = recipe.dateUpdated
+                Text(
+                        text = if(updated != null) {
+                            "Updated ${updated} by ${publisher}"
+                        }
+                        else {
+                            "By ${publisher}"
+                        }
+                        ,
+                        modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp)
+                        ,
+                        style = MaterialTheme.typography.caption
+                )
+            }
+            recipe.description?.let { description ->
+                if(description != "N/A"){
+                    Text(
+                            text = description,
                             modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(bottom = 8.dp)
                             ,
-                            style = MaterialTheme.typography.caption
+                            style = MaterialTheme.typography.body1
                     )
                 }
-                recipe.description?.let { description ->
-                    if(description != "N/A"){
-                        Text(
-                                text = description,
-                                modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(bottom = 8.dp)
-                                ,
-                                style = MaterialTheme.typography.body1
-                        )
-                    }
-                }
-                recipe.ingredients?.let { ingredients ->
-                    for(ingredient in ingredients){
-                        Text(
-                                text = ingredient,
-                                modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(bottom = 4.dp)
-                                ,
-                                style = MaterialTheme.typography.body1
-                        )
-                    }
-                }
-                recipe.cookingInstructions?.let { instructions ->
+            }
+            recipe.ingredients?.let { ingredients ->
+                for(ingredient in ingredients){
                     Text(
-                            text = instructions,
+                            text = ingredient,
                             modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(bottom = 4.dp)
@@ -210,7 +236,18 @@ fun RecipeView(
                     )
                 }
             }
+            recipe.cookingInstructions?.let { instructions ->
+                Text(
+                        text = instructions,
+                        modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 4.dp)
+                        ,
+                        style = MaterialTheme.typography.body1
+                )
+            }
         }
+        Spacer(modifier = Modifier.height(IMAGE_HEIGHT.dp))
     }
 }
 
